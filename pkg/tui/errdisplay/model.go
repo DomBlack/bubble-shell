@@ -17,7 +17,17 @@ type Model struct {
 	longestFunc int
 }
 
+// New creates a new error display model
+//
+// If cfg is nil then the default config will be used
 func New(cfg *config.Config, err error) tea.Model {
+	if cfg == nil {
+		cfg = config.Default()
+	}
+	if err == nil {
+		err = errors.New("nil error passed to errdisplay.New")
+	}
+
 	originalFrames := DeepestStack(err)
 	frames := FilterCommonFrames(cfg, originalFrames)
 
