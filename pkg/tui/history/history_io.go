@@ -63,7 +63,11 @@ func (m Model) ReadHistory() tea.Cmd {
 				return nil, err
 			}
 			if part {
-				return nil, errors.New("line too long")
+				if m.cfg.InlineShell {
+					continue
+				} else {
+					return nil, errors.New("line too long")
+				}
 			}
 			if !utf8.Valid(line) {
 				return nil, errors.New("line isn't valid utf8")
@@ -73,6 +77,7 @@ func (m Model) ReadHistory() tea.Cmd {
 			if err := json.Unmarshal(line, &item); err != nil {
 				return nil, errors.Wrap(err, "unable to unmarshal history item")
 			}
+			item.LoadedHistory = true
 
 			history = append(history, item)
 			if len(history) > Limit {
@@ -82,7 +87,8 @@ func (m Model) ReadHistory() tea.Cmd {
 
 		// Mark the history as restored if there is any history
 		if len(history) > 0 {
-			item := NewItem("restored history from previous session", SuccessStatus)
+			item := NewItem("", "restored history from previous session", SuccessStatus)
+			item.LoadedHistory = true
 			item.ItemType = HistoryRestored
 			history = append(history, item)
 		}
@@ -93,7 +99,7 @@ func (m Model) ReadHistory() tea.Cmd {
 	return func() tea.Msg {
 		history, err := readHistory()
 		if err != nil {
-			item := NewItem("error loading history file", ErrorStatus)
+			item := NewItem("", "error loading history file", ErrorStatus)
 			item.ItemType = InternalError
 			item.Error = err
 
@@ -151,7 +157,7 @@ func (m Model) SaveHistory(items []Item) tea.Cmd {
 	return func() tea.Msg {
 		err := saveHistory()
 		if err != nil {
-			item := NewItem("error saving history file", ErrorStatus)
+			item := NewItem("", "error saving history file", ErrorStatus)
 			item.ItemType = InternalError
 			item.Error = err
 

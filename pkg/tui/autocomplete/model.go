@@ -156,7 +156,7 @@ func (m Model) View() string {
 
 		columns := make([][]string, numColumns)
 		for i, option := range m.options {
-			colNum := i / perColumn
+			colNum := i % perColumn
 
 			if i == m.selectedOption {
 				columns[colNum] = append(columns[colNum], m.selectedOptionStyle.Render(option.Name))

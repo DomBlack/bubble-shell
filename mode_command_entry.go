@@ -18,6 +18,7 @@ func (c *CommandEntryMode) Enter(m Model) (Model, tea.Cmd) {
 	}
 
 	m.lookBackPartial = ""
+	m.input.Prompt = m.cfg.PromptFunc()
 	m.input.CursorEnd()
 	m.input.Focus()
 
@@ -64,11 +65,12 @@ func (c *CommandEntryMode) Update(m Model, msg tea.Msg) (Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 
-			historyItem := history.NewItem(line, history.RunningStatus)
+			historyItem := history.NewItem(m.input.Prompt, line, history.RunningStatus)
 			m.input.SetValue("")
 			m.input.CursorEnd()
 
-			return m, tea.Batch(
+			return m, tea.Sequence(
+				m.Enter(&CommandRunningMode{}),
 				m.history.AppendItem(historyItem),
 				m.ExecuteCommand(historyItem),
 			)
@@ -83,11 +85,7 @@ func (c *CommandEntryMode) Update(m Model, msg tea.Msg) (Model, tea.Cmd) {
 			return m, m.Enter(&AutoCompleteMode{})
 
 		case key.Matches(msg, m.cfg.KeyMap.Cancel):
-			if m.currentCmdCancel != nil {
-				m.currentCmdCancel()
-				m.currentCmdCancel = nil
-				return m, nil
-			} else if m.input.Value() != "" {
+			if m.input.Value() != "" {
 				m.input.SetValue("")
 				m.input.CursorEnd()
 				return m, nil

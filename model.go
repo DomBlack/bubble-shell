@@ -181,34 +181,39 @@ func (m Model) View() string {
 	input := m.input.View()
 	modeView := m.mode.AdditionalView(m)
 
-	// Fit the history to the screen based on the output of the autocomplete and if we're showing the search input
-	neededHistoryHeight := m.height - 1 // one for the prompt
-	if modeView != "" {
-		neededHistoryHeight -= lipgloss.Height(modeView)
+	if !m.cfg.InlineShell {
+		// Fit the history to the screen based on the output of the autocomplete and if we're showing the search input
+		neededHistoryHeight := m.height - 1 // one for the prompt
+		if modeView != "" {
+			neededHistoryHeight -= lipgloss.Height(modeView)
+		}
+
+		for lipgloss.Height(historyView) > neededHistoryHeight {
+			firstNewLine := strings.IndexRune(historyView, '\n')
+			historyView = historyView[firstNewLine+1:]
+		}
 	}
 
-	for lipgloss.Height(historyView) > neededHistoryHeight {
-		firstNewLine := strings.IndexRune(historyView, '\n')
-		historyView = historyView[firstNewLine+1:]
+	// If we're an inline shell and the previous command is still running, wait for it to finish
+	lastCmd := m.history.Lookback(1)
+	if m.cfg.InlineShell && !lastCmd.LoadedHistory && !lastCmd.Started.IsZero() && lastCmd.Finished.IsZero() {
+		input = ""
 	}
 
-	// Now decide how to render the view
-	if modeView != "" {
-		return lipgloss.JoinVertical(lipgloss.Top,
-			historyView,
-			input,
-			modeView,
-		)
-	} else {
-		return lipgloss.JoinVertical(lipgloss.Top,
-			historyView,
-			input,
-		)
+	// Now render all the parts vertically
+	parts := make([]string, 0, 3)
+	parts = append(parts, historyView)
+	if input != "" {
+		parts = append(parts, input)
 	}
+	if modeView != "" {
+		parts = append(parts, modeView)
+	}
+	return lipgloss.JoinVertical(lipgloss.Top, parts...)
 }
 
 func (m Model) ExecuteCommand(cmd history.Item) tea.Cmd {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(m.cfg.RootContext)
 
 	return tea.Batch(
 		func() tea.Msg {
@@ -229,8 +234,10 @@ func (m Model) ExecuteCommand(cmd history.Item) tea.Cmd {
 			// Capture the stdout
 			cmd.Output = strings.TrimSpace(string(stdoutBuffer.Bytes()))
 
-			// Create an UpdateItem [tea.Cmd] and then execute it
-			return m.history.UpdateItem(cmd)()
+			return tea.Sequence(
+				m.history.UpdateItem(cmd),    // Create an UpdateItem [tea.Cmd]
+				m.Enter(&CommandEntryMode{}), // Then switch back to command entry mode
+			)()
 		},
 	)
 }

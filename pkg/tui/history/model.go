@@ -77,6 +77,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// item and then saves the history
 	case updateItemMsg:
 		if m.id.Matches(msg) {
+			var cmds []tea.Cmd
+
+			// If we're an inline shell and the item is no longer running
+			// then we need to print it outside the bubbletea managed area
+			// so the normal shell scrollbar will work
+			if m.cfg.InlineShell && msg.Item.Status > RunningStatus {
+				// Mark it as loaded history so we wont render it within the bubble tea program now
+				msg.Item.LoadedHistory = true
+				cmds = append(cmds, tea.Println(msg.Item.View(m.cfg, m.width)))
+			}
+
 			// Start searching from the end of the slice as
 			// 99 times out of 100 we'll be updating the most
 			// recent item
@@ -93,10 +104,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 			// If we didn't find it then we need to add it
 			if !found {
-				return m, m.AppendItem(msg.Item)
+				cmds = append(cmds, m.AppendItem(msg.Item))
+			} else {
+				cmds = append(cmds, m.SaveHistory(m.Items))
 			}
 
-			return m, m.SaveHistory(m.Items)
+			return m, tea.Batch(cmds...)
 		}
 	}
 
@@ -106,6 +119,18 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 // View implements tea.Model view function
 func (m Model) View() string {
 	lineRender := lipgloss.NewStyle().Width(m.width)
+
+	// If we're inline, just render everything all at once - except for loaded history
+	if m.cfg.InlineShell {
+		lines := make([]string, 0, len(m.Items))
+		for _, item := range m.Items {
+			if !item.LoadedHistory {
+				lines = append(lines, lineRender.Render(item.View(m.cfg, m.width)))
+			}
+		}
+
+		return lipgloss.JoinVertical(lipgloss.Left, lines...)
+	}
 
 	// Render the lines in reverse order
 	// But we only want a maximum of m.height lines

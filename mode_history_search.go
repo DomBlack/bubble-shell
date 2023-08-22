@@ -32,9 +32,9 @@ func (h *HistorySearchMode) Update(m Model, msg tea.Msg) (Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, m.cfg.KeyMap.ExecuteCommand):
 			line := m.input.Value()
-			historyItem := history.NewItem(line, history.RunningStatus)
+			historyItem := history.NewItem(m.input.Prompt, line, history.RunningStatus)
 			return m, tea.Sequence(
-				m.Enter(&CommandEntryMode{}),
+				m.Enter(&CommandRunningMode{}),
 				m.history.AppendItem(historyItem),
 				m.ExecuteCommand(historyItem),
 			)

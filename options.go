@@ -1,6 +1,8 @@
 package shell
 
 import (
+	"context"
+
 	"github.com/DomBlack/bubble-shell/internal/config"
 	"github.com/DomBlack/bubble-shell/pkg/config/keymap"
 	"github.com/DomBlack/bubble-shell/pkg/config/styles"
@@ -78,5 +80,38 @@ func WithAdditionalStackTraceFilters(packages ...string) Option {
 func WithStackTraceFilters(packages ...string) Option {
 	return func(o *config.Config) {
 		o.PackagesToFilterFromStack = packages
+	}
+}
+
+// WithInlineShell sets the shell to be inline rather than trying to render full screen
+//
+// This means that recovered history will not be shown, however your terminals own render
+// will be incharge of scrolling.
+func WithInlineShell() Option {
+	return func(o *config.Config) {
+		o.InlineShell = true
+	}
+}
+
+// WithBaseContext sets the context that commands will be run with
+// when they are executed by users.
+//
+// By default [context.Background] will be used
+func WithBaseContext(ctx context.Context) Option {
+	return func(o *config.Config) {
+		o.RootContext = ctx
+	}
+}
+
+// WithPromptFunc sets the function for rendering the prompt
+//
+// By default a function will be provided that returns "> "
+func WithPromptFunc(promptFunc func() string) Option {
+	if promptFunc == nil {
+		panic("promptFunc cannot be nil")
+	}
+
+	return func(o *config.Config) {
+		o.PromptFunc = promptFunc
 	}
 }

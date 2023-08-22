@@ -1,6 +1,8 @@
 package config
 
 import (
+	"context"
+
 	"github.com/DomBlack/bubble-shell/pkg/config/keymap"
 	"github.com/DomBlack/bubble-shell/pkg/config/styles"
 )
@@ -24,12 +26,25 @@ type Config struct {
 	//
 	// If empty no filtering will be done
 	PackagesToFilterFromStack []string
+
+	// InlineShell will cause the shell to be rendered inline
+	// rather than taking over the whole terminal
+	InlineShell bool
+
+	// RootContext is the context that will be used for the
+	// commands when they run
+	RootContext context.Context
+
+	// PromptFunc is a function that returns the prompt to be used
+	PromptFunc func() string
 }
 
 // Default returns a default configuration for the shell
 func Default() *Config {
 	return &Config{
 		HistoryFile:    ".bubble-shell-history",
+		RootContext:    context.Background(),
+		PromptFunc:     func() string { return "> " },
 		KeyMap:         keymap.Default,
 		Styles:         styles.Default,
 		MaxStackFrames: 8,

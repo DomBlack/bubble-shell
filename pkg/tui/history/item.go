@@ -36,6 +36,7 @@ const (
 type Item struct {
 	// This group of fields are serialized and stored
 	ID       xid.ID    `json:"id"`       // The unique ID of the command
+	Prompt   string    `json:"prompt"`   // The prompt that was displayed when the command was executed
 	Line     string    `json:"line"`     // The command executed
 	Started  time.Time `json:"started"`  // The time the command was executed
 	Finished time.Time `json:"finished"` // The time the command finished executing
@@ -44,14 +45,16 @@ type Item struct {
 
 	// This group of fields are not serialized and are only used
 	// for rendering the UI during the current shell session
-	ItemType ItemType `json:"-"` // If true then this item is an internal error item and not a user command
-	Error    error    `json:"-"` // The error returned from the command
+	ItemType      ItemType `json:"-"` // If true then this item is an internal error item and not a user command
+	Error         error    `json:"-"` // The error returned from the command
+	LoadedHistory bool     `json:"-"` // If true then this item is a history restored item and not a user command
 }
 
 // NewItem creates a new history item with the given line and status
-func NewItem(line string, status Status) Item {
+func NewItem(prompt, line string, status Status) Item {
 	return Item{
 		ID:       xid.New(),
+		Prompt:   prompt,
 		Line:     line,
 		Started:  time.Now(),
 		Status:   status,
@@ -94,7 +97,12 @@ func (i Item) View(cfg *config.Config, width int) string {
 	lines[0] = cfg.Styles.HistoricLine.Render(i.Line)
 	switch i.ItemType {
 	case Command:
-		lines[0] = cfg.Styles.HistoricPrompt.Render("> ") + lines[0]
+		prompt := i.Prompt
+		if prompt == "" {
+			prompt = "> "
+		}
+
+		lines[0] = cfg.Styles.HistoricPrompt.Render(prompt) + lines[0]
 
 	case InternalError:
 		lines[0] = cfg.Styles.InternalError.Render("!! ") + lines[0]
