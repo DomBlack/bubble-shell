@@ -20,7 +20,6 @@ func (h *HistoryLookbackMode) Enter(m Model) (Model, tea.Cmd) {
 }
 
 func (h *HistoryLookbackMode) Leave(m Model) (Model, tea.Cmd) {
-	m.input.SetValue("")
 	m.input.Blur()
 	return m, nil
 }
@@ -96,17 +95,14 @@ func (h *HistoryLookbackMode) Update(m Model, msg tea.Msg) (Model, tea.Cmd) {
 		case key.Matches(msg, m.cfg.KeyMap.Cancel):
 			return m, m.Enter(&CommandEntryMode{})
 
-		case msg.Type == tea.KeyLeft || msg.Type == tea.KeyRight || msg.Type == tea.KeyTab:
-			line := m.history.Lookback(m.lookBack).Line
-			m.input.SetValue(line)
-
-			if msg.Type == tea.KeyLeft {
+		default:
+			if msg.Type == tea.KeyRight || msg.Type == tea.KeyTab {
+				return m, m.Enter(&CommandEntryMode{KeepInputContent: true})
+			} else {
 				return m, tea.Sequence(
 					m.Enter(&CommandEntryMode{KeepInputContent: true}),
 					func() tea.Msg { return msg },
 				)
-			} else {
-				return m, m.Enter(&CommandEntryMode{KeepInputContent: true})
 			}
 		}
 	}
