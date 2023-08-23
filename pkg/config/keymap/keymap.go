@@ -11,6 +11,8 @@ import (
 type KeyMap struct {
 	Up             key.Binding // Up is a binding for the user to look back in their command history
 	Down           key.Binding // Down is a binding for the user to look forward in their command history
+	Left           key.Binding // Left is a binding for the user to move the cursor left
+	Right          key.Binding // Right is a binding for the user to move the cursor right
 	ExecuteCommand key.Binding // ExecuteCommand is a binding for the user to execute the current command
 
 	// Cancel is a binding for the user to cancel their current command
@@ -28,6 +30,9 @@ type KeyMap struct {
 
 	AutoComplete         key.Binding // AutoComplete is a binding for the user to autocomplete their current command or cycle through autocompletions
 	PreviousAutoComplete key.Binding // PreviousAutoComplete is a binding for the user to cycle through previous autocompletions
+
+	// Quit is the binding for the user to quit the shell no matter what they are doing
+	Quit key.Binding
 }
 
 // Default is the default keymap for the prompt
@@ -40,6 +45,16 @@ var Default = KeyMap{
 	Down: key.NewBinding(
 		key.WithKeys("down"),
 		key.WithHelp("↓", "history down"),
+	),
+
+	Left: key.NewBinding(
+		key.WithKeys("left"),
+		key.WithHelp("←", "left"),
+	),
+
+	Right: key.NewBinding(
+		key.WithKeys("right"),
+		key.WithHelp("→", "right"),
 	),
 
 	ExecuteCommand: key.NewBinding(
@@ -70,5 +85,10 @@ var Default = KeyMap{
 	PreviousAutoComplete: key.NewBinding(
 		key.WithKeys("shift+tab"),
 		key.WithHelp("shift+tab", "previous autocomplete"),
+	),
+
+	Quit: key.NewBinding(
+		key.WithKeys("ctrl+d"),
+		key.WithHelp("ctrl+d", "quit"),
 	),
 }

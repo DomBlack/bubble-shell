@@ -151,6 +151,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.currentCmdCancel = msg.cancel
 		}
 		return m, nil
+
+	case tea.KeyMsg:
+		switch {
+		case key.Matches(msg, m.cfg.KeyMap.Quit):
+			return m, tea.Quit
+		}
 	}
 
 	if m.mode != nil {

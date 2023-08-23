@@ -13,7 +13,7 @@ type AutoCompleteMode struct{}
 var _ Mode = (*AutoCompleteMode)(nil)
 
 func (a *AutoCompleteMode) Enter(m Model) (Model, tea.Cmd) {
-	m.input.Focus()
+	m.input.Blur()
 	return m, m.autocomplete.AutoComplete(m.input.Value(), m.input.Position())
 }
 
@@ -31,24 +31,38 @@ func (a *AutoCompleteMode) Update(m Model, msg tea.Msg) (Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.cfg.KeyMap.AutoComplete):
-			return m, m.autocomplete.Next()
+			return m, m.autocomplete.NextResult()
 
 		case key.Matches(msg, m.cfg.KeyMap.PreviousAutoComplete):
-			return m, m.autocomplete.Previous()
+			return m, m.autocomplete.PreviousResult()
+
+		case key.Matches(msg, m.cfg.KeyMap.Up):
+			return m, m.autocomplete.PreviousRow()
+
+		case key.Matches(msg, m.cfg.KeyMap.Down):
+			return m, m.autocomplete.NextRow()
+
+		case key.Matches(msg, m.cfg.KeyMap.Left):
+			return m, m.autocomplete.PreviousColumn()
+
+		case key.Matches(msg, m.cfg.KeyMap.Right):
+			return m, m.autocomplete.NextColumn()
 
 		case key.Matches(msg, m.cfg.KeyMap.Cancel):
-			return m, m.Enter(&CommandEntryMode{})
+			return m, m.Enter(&CommandEntryMode{KeepInputContent: true})
 
 		case key.Matches(msg, m.cfg.KeyMap.ExecuteCommand):
 			return a.AcceptOption(m)
 
-		default:
-			if line := m.autocomplete.Accept(); line != "" {
-				m.input.SetValue(line)
-				m.input.CursorEnd()
-			}
+		case msg.Type == tea.KeySpace:
+			return a.AcceptOption(m)
 
-			return m, m.Enter(&CommandEntryMode{KeepInputContent: true})
+		default:
+			// default is to exit the mode and re-send the key message
+			return m, tea.Sequence(
+				m.Enter(&CommandEntryMode{KeepInputContent: true}),
+				func() tea.Msg { return msg }, // re-send the key message
+			)
 		}
 	}
 

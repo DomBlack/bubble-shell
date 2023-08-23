@@ -3,6 +3,7 @@ package autocomplete
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -14,7 +15,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const maxLinesToShow = 8
+const maxLinesToShow = 15
+const colPadding = 3
 
 type Model struct {
 	id            modelid.ID
@@ -68,11 +70,34 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case moveOption:
 		if m.id.Matches(msg) {
-			m.selectedOption += msg.Delta
-			if m.selectedOption >= len(m.options) {
-				m.selectedOption = 0
-			} else if m.selectedOption < 0 {
-				m.selectedOption = len(m.options) - 1
+			delta := msg.Delta
+			allowWrapping := false
+
+			switch msg.Type {
+			case moveResult:
+				allowWrapping = true
+
+			case moveRow:
+				delta = m.numColumns() * msg.Delta
+
+			case moveColumn:
+				numColumns := m.numColumns()
+				currentCol := m.selectedOption % numColumns
+				if currentCol+delta < 0 || currentCol+delta >= numColumns {
+					// Don't wrap column navigation
+					delta = 0
+				}
+			}
+
+			newIndex := m.selectedOption + delta
+			if newIndex >= 0 && newIndex < len(m.options) {
+				m.selectedOption = newIndex
+			} else if allowWrapping {
+				if newIndex < 0 {
+					m.selectedOption = len(m.options) + newIndex
+				} else {
+					m.selectedOption = newIndex - len(m.options)
+				}
 			}
 		}
 
@@ -124,6 +149,35 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) numColumns() int {
+	// Don't show more than maxLinesToShow or the height in the terminal
+	maxLines := maxLinesToShow
+	if maxLines > m.height-2 {
+		maxLines = m.height - 2
+	}
+
+	// If we have descriptions and can show all of the in a single column
+	// without scrolling then do so
+	if m.hasDescriptions && len(m.options) <= maxLines {
+		return 1
+	}
+
+	// Otherwise calculate the number of columns we can show
+	numColumns := m.width / (m.longestOption + colPadding)
+	if numColumns == 0 {
+		numColumns = 1
+	}
+	return numColumns
+}
+
+func (m Model) itemsPerColumn() int {
+	perColumn := int(math.Ceil(float64(len(m.options)) / float64(m.numColumns())))
+	if perColumn == 0 {
+		perColumn = 1
+	}
+	return perColumn
+}
+
 func (m Model) View() string {
 	if !m.init {
 		return ""
@@ -133,30 +187,15 @@ func (m Model) View() string {
 		return ""
 	}
 
-	// Don't show more than maxLinesToShow or the height in the terminal
-	maxLines := maxLinesToShow
-	if maxLines > m.height-2 {
-		maxLines = m.height - 2
-	}
+	// Render in columns
+	numColumns := m.numColumns()
 
 	// If we've got too many options or none of the options have a description
 	// list them in columns with no descriptions
-	if len(m.options) > maxLines || !m.hasDescriptions {
-		const colPadding = 3
-		// Render in columns
-		numColumns := m.width / (m.longestOption + colPadding)
-		if numColumns == 0 {
-			numColumns = 1
-		}
-
-		perColumn := len(m.options) / numColumns
-		if perColumn == 0 {
-			perColumn = 1
-		}
-
+	if numColumns > 1 || !m.hasDescriptions {
 		columns := make([][]string, numColumns)
 		for i, option := range m.options {
-			colNum := i % perColumn
+			colNum := i % numColumns
 
 			if i == m.selectedOption {
 				columns[colNum] = append(columns[colNum], m.selectedOptionStyle.Render(option.Name))
@@ -249,22 +288,68 @@ func (m Model) AutoComplete(input string, cursorPosition int) tea.Cmd {
 	}
 }
 
-// Next returns a command that will select the next option
-func (m Model) Next() tea.Cmd {
+// NextResult returns a command that will select the next option
+func (m Model) NextResult() tea.Cmd {
 	return func() tea.Msg {
 		return moveOption{
 			ID:    m.id,
 			Delta: 1,
+			Type:  moveResult,
 		}
 	}
 }
 
-// Previous returns a command that will select the previous option
-func (m Model) Previous() tea.Cmd {
+// PreviousResult returns a command that will select the previous option
+func (m Model) PreviousResult() tea.Cmd {
 	return func() tea.Msg {
 		return moveOption{
 			ID:    m.id,
 			Delta: -1,
+			Type:  moveResult,
+		}
+	}
+}
+
+// NextRow returns a command that will select the next option
+func (m Model) NextRow() tea.Cmd {
+	return func() tea.Msg {
+		return moveOption{
+			ID:    m.id,
+			Delta: 1,
+			Type:  moveRow,
+		}
+	}
+}
+
+// PreviousRow returns a command that will select the previous option
+func (m Model) PreviousRow() tea.Cmd {
+	return func() tea.Msg {
+		return moveOption{
+			ID:    m.id,
+			Delta: -1,
+			Type:  moveRow,
+		}
+	}
+}
+
+// NextColumn returns a command that will select the next option
+func (m Model) NextColumn() tea.Cmd {
+	return func() tea.Msg {
+		return moveOption{
+			ID:    m.id,
+			Delta: 1,
+			Type:  moveColumn,
+		}
+	}
+}
+
+// PreviousColumn returns a command that will select the previous option
+func (m Model) PreviousColumn() tea.Cmd {
+	return func() tea.Msg {
+		return moveOption{
+			ID:    m.id,
+			Delta: -1,
+			Type:  moveColumn,
 		}
 	}
 }

@@ -37,11 +37,20 @@ func (msg clearMsg) ForModelID() modelid.ID {
 	return msg.ID
 }
 
+type moveType uint8
+
+const (
+	moveResult moveType = iota
+	moveColumn
+	moveRow
+)
+
 // moveOption is a message that is sent to the autocomplete
 // model to move the currently selected option
 type moveOption struct {
 	ID    modelid.ID
 	Delta int
+	Type  moveType
 }
 
 func (msg moveOption) ForModelID() modelid.ID {
