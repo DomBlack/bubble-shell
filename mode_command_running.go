@@ -27,7 +27,7 @@ func (c *CommandRunningMode) Update(m Model, msg tea.Msg) (Model, tea.Cmd) {
 				m.currentCmdCancel = nil
 				return m, nil
 			} else {
-				return m, tea.Quit
+				return m, m.Shutdown
 			}
 		}
 	}

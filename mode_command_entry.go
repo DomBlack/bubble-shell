@@ -62,7 +62,7 @@ func (c *CommandEntryMode) Update(m Model, msg tea.Msg) (Model, tea.Cmd) {
 			}
 
 			if line == "exit" || line == "quit" {
-				return m, tea.Quit
+				return m, m.Shutdown
 			}
 
 			historyItem := history.NewItem(m.input.Prompt, line, history.RunningStatus)
@@ -90,7 +90,7 @@ func (c *CommandEntryMode) Update(m Model, msg tea.Msg) (Model, tea.Cmd) {
 				m.input.CursorEnd()
 				return m, nil
 			} else {
-				return m, tea.Quit
+				return m, m.Shutdown
 			}
 		}
 	}

@@ -41,6 +41,8 @@ type Model struct {
 	lookBack        int
 	lookBackPartial string
 
+	shuttingDown bool
+
 	mode Mode
 }
 
@@ -131,6 +133,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, tea.Batch(cmds...)
 
+	case ShutdownMsg:
+		if m.id.Matches(msg) {
+			m.shuttingDown = true
+			return m, tea.Quit
+		}
+
 	case enterModeMsg:
 		if m.id.Matches(msg) {
 			if m.mode == nil {
@@ -155,7 +163,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.cfg.KeyMap.Quit):
-			return m, tea.Quit
+			return m, m.Shutdown
 		}
 	}
 
@@ -209,11 +217,13 @@ func (m Model) View() string {
 	// Now render all the parts vertically
 	parts := make([]string, 0, 3)
 	parts = append(parts, historyView)
-	if input != "" {
-		parts = append(parts, input)
-	}
-	if modeView != "" {
-		parts = append(parts, modeView)
+	if !m.shuttingDown { // on shutdown we don't want to render the input or other mode views
+		if input != "" {
+			parts = append(parts, input)
+		}
+		if modeView != "" {
+			parts = append(parts, modeView)
+		}
 	}
 	return lipgloss.JoinVertical(lipgloss.Top, parts...)
 }
@@ -246,6 +256,11 @@ func (m Model) ExecuteCommand(cmd history.Item) tea.Cmd {
 			)()
 		},
 	)
+}
+
+// Shutdown is a [tea.Cmd] to shutdown the shell cleanly
+func (m Model) Shutdown() tea.Msg {
+	return ShutdownMsg{ID: m.id}
 }
 
 func (m Model) ShortHelp() []key.Binding {

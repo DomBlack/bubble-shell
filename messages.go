@@ -28,3 +28,16 @@ type enterModeMsg struct {
 func (msg enterModeMsg) ForModelID() modelid.ID {
 	return msg.ID
 }
+
+// ShutdownMsg is sent by the shell when it wants to shutdown
+// the application.
+//
+// It is used to allow for one render cycle to occur before
+// the [tea.Quit] is sent, allowing us to remove the prompt
+type ShutdownMsg struct {
+	ID modelid.ID
+}
+
+func (msg ShutdownMsg) ForModelID() modelid.ID {
+	return msg.ID
+}
