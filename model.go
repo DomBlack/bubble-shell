@@ -3,9 +3,12 @@ package shell
 import (
 	"bytes"
 	"context"
+	"io"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/DomBlack/bubble-shell/internal/chanwriter"
 	"github.com/DomBlack/bubble-shell/internal/cobrautils"
 	"github.com/DomBlack/bubble-shell/internal/config"
 	"github.com/DomBlack/bubble-shell/pkg/modelid"
@@ -230,16 +233,21 @@ func (m Model) View() string {
 
 func (m Model) ExecuteCommand(cmd history.Item) tea.Cmd {
 	ctx, cancel := context.WithCancel(m.cfg.RootContext)
+	w := chanwriter.New()
 
 	return tea.Batch(
 		func() tea.Msg {
 			return currentCmdContextCancelFuncMsg{m.id, cancel}
 		},
+		chanwriter.Read(w, m.history.StreamOutputFor(cmd)),
 		func() tea.Msg {
 			defer cancel()
-			stdoutBuffer := new(bytes.Buffer)
+			defer func() { _ = w.Close() }()
 
-			err := cobrautils.ExecuteCmd(ctx, m.rootCmd, cmd.Line, stdoutBuffer)
+			stdoutBuffer := new(bytes.Buffer)
+			dualW := io.MultiWriter(stdoutBuffer, w)
+
+			err := cobrautils.ExecuteCmd(ctx, m.rootCmd, cmd.Line, os.Stdin, dualW, dualW)
 			cmd.Finished = time.Now()
 			if err != nil {
 				cmd.Status = history.ErrorStatus

@@ -3,7 +3,9 @@ package autocomplete
 import (
 	"context"
 	"fmt"
+	"io"
 	"math"
+	"os"
 	"strings"
 	"time"
 
@@ -250,7 +252,8 @@ func (m Model) computeOptions(input string) (cobra.ShellCompDirective, []Option,
 
 	var sb strings.Builder
 
-	err := cobrautils.ExecuteCmd(ctx, m.rootCmd, cmd, &sb)
+	// discard stderr - as cobra autocompletion writes to stderr with "debug" data which we don't care about
+	err := cobrautils.ExecuteCmd(ctx, m.rootCmd, cmd, os.Stdin, &sb, io.Discard)
 	if err != nil {
 		return cobra.ShellCompDirectiveError, nil, errors.Wrap(err, "failed to execute shell completion")
 	}

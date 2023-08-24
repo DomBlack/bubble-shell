@@ -45,9 +45,10 @@ type Item struct {
 
 	// This group of fields are not serialized and are only used
 	// for rendering the UI during the current shell session
-	ItemType      ItemType `json:"-"` // If true then this item is an internal error item and not a user command
-	Error         error    `json:"-"` // The error returned from the command
-	LoadedHistory bool     `json:"-"` // If true then this item is a history restored item and not a user command
+	StreamedOutput []byte   `json:"-"` // The output of the command as it is streamed
+	ItemType       ItemType `json:"-"` // If true then this item is an internal error item and not a user command
+	Error          error    `json:"-"` // The error returned from the command
+	LoadedHistory  bool     `json:"-"` // If true then this item is a history restored item and not a user command
 }
 
 // NewItem creates a new history item with the given line and status
@@ -122,11 +123,14 @@ func (i Item) View(cfg *config.Config, width int) string {
 	// Render the output if we have any
 	if i.Output != "" {
 		lines = append(lines, i.Output)
+	} else if len(i.StreamedOutput) > 0 && i.Status == RunningStatus {
+		// If we're running, then render the streamed output
+		lines = append(lines, strings.TrimSpace(string(i.StreamedOutput)))
 	}
 
 	// Render the error if we have any
 	if i.Error != nil {
-		errView := errdisplay.New(cfg, i.Error).View()
+		errView := lipgloss.NewStyle().Width(width).Render(errdisplay.New(cfg, i.Error).View())
 		if errView != "" {
 			lines = append(lines, errView)
 		}

@@ -7,6 +7,7 @@ import (
 	. "github.com/DomBlack/bubble-shell/pkg/modelid"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/rs/xid"
 )
 
 const (
@@ -85,7 +86,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if m.cfg.InlineShell && msg.Item.Status > RunningStatus {
 				// Mark it as loaded history so we wont render it within the bubble tea program now
 				msg.Item.LoadedHistory = true
-				cmds = append(cmds, tea.Println(msg.Item.View(m.cfg, m.width)))
+				cmds = append(cmds, tea.Println(strings.TrimSuffix(msg.Item.View(m.cfg, m.width), "\n")))
 			}
 
 			// Start searching from the end of the slice as
@@ -110,6 +111,21 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 
 			return m, tea.Batch(cmds...)
+		}
+
+	case streamOutput:
+		if m.id.Matches(msg) {
+			// Start searching from the end of the slice as
+			// 99 times out of 100 we'll be updating the most
+			// recent item
+			if len(m.Items) > 0 {
+				for i := len(m.Items) - 1; i >= 0; i-- {
+					if m.Items[i].ID == msg.ItemID {
+						m.Items[i].StreamedOutput = append(m.Items[i].StreamedOutput, msg.Bytes...)
+						break
+					}
+				}
+			}
 		}
 	}
 
@@ -240,6 +256,19 @@ func (m Model) UpdateItem(item Item) tea.Cmd {
 	}
 }
 
+// StreamOutputFor returns a function that appends the given bytes to the given item
+// by returning an append message
+func (m Model) StreamOutputFor(cmd Item) func(bytes []byte) tea.Msg {
+	return func(bytes []byte) tea.Msg {
+		b := bytes
+		return streamOutput{
+			ID:     m.id,
+			ItemID: cmd.ID,
+			Bytes:  b,
+		}
+	}
+}
+
 type addItemMsg struct {
 	ID   ID
 	Item Item
@@ -255,5 +284,15 @@ type updateItemMsg struct {
 }
 
 func (msg updateItemMsg) ForModelID() ID {
+	return msg.ID
+}
+
+type streamOutput struct {
+	ID     ID
+	ItemID xid.ID
+	Bytes  []byte
+}
+
+func (msg streamOutput) ForModelID() ID {
 	return msg.ID
 }

@@ -1,7 +1,6 @@
 package cobrautils
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"os"
@@ -38,7 +37,7 @@ func InitRootCmd(rootCmd *cobra.Command) {
 }
 
 // ExecuteCmd executes a command and captures the output
-func ExecuteCmd(ctx context.Context, rootCmd *cobra.Command, line string, out io.Writer) error {
+func ExecuteCmd(ctx context.Context, rootCmd *cobra.Command, line string, in io.Reader, stdout io.Writer, stderr io.Writer) error {
 	// Capture stdout and stderr and then restore them when we leave here
 	stdoutCaptureMu.Lock()
 	originalStdOut := os.Stdout
@@ -50,19 +49,24 @@ func ExecuteCmd(ctx context.Context, rootCmd *cobra.Command, line string, out io
 	}()
 
 	// Set up our stdout and stderr pipes
-	r, w, _ := os.Pipe()
+	stdoutR, stdoutW, _ := os.Pipe()
+	stderrR, stderrW, _ := os.Pipe()
+	os.Stdout = stdoutW
+	os.Stderr = stderrW
 
-	os.Stdout = w
-	os.Stderr = w
-
-	stdOutBuf := make(chan []byte)
+	// Copy the output to the correct places
+	var wg sync.WaitGroup
+	wg.Add(2)
 	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, r)
-		stdOutBuf <- buf.Bytes()
+		_, _ = io.Copy(stdout, stdoutR)
+		wg.Done()
+	}()
+	go func() {
+		_, _ = io.Copy(stderr, stderrR)
+		wg.Done()
 	}()
 
-	// Now execute the command
+	// Reset the internal state of the command
 	args := strings.Split(line, " ")
 
 	if cmd, _, err := rootCmd.Find(args); err == nil {
@@ -82,16 +86,20 @@ func ExecuteCmd(ctx context.Context, rootCmd *cobra.Command, line string, out io
 		cmd.InitDefaultVersionFlag()
 	}
 
-	rootCmd.SetOut(out)
-	rootCmd.SetErr(out)
+	// Setup the cobra command to output to the write places
+	rootCmd.SetIn(in)
+	rootCmd.SetOut(stdoutW)
+	rootCmd.SetErr(stderrW)
 	rootCmd.SetContext(ctx)
 	rootCmd.SetArgs(args)
 
+	// Finally execute it!
 	err := rootCmd.Execute()
 
-	// Close the pipe
-	_ = w.Close()
-	_, _ = out.Write(<-stdOutBuf)
+	// Close the pipes for all the IO copies to finish
+	_ = stderrW.Close()
+	_ = stdoutW.Close()
+	wg.Wait()
 
 	return errors.WithStack(err)
 }
