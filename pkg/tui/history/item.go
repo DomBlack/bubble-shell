@@ -90,8 +90,20 @@ func (i Item) View(cfg *config.Config, width int) string {
 	if finished.IsZero() && i.Status == RunningStatus {
 		finished = time.Now()
 	}
-	if !i.Finished.IsZero() {
-		timeStr = fmt.Sprintf("(%dms) %s", i.Finished.Sub(i.Started).Milliseconds(), timeStr)
+	if !finished.IsZero() {
+		dur := finished.Sub(i.Started)
+		switch {
+		case dur < 1*time.Second:
+			timeStr = fmt.Sprintf("(%dms) %s", dur.Milliseconds(), timeStr)
+		case dur < 10*time.Second:
+			timeStr = fmt.Sprintf("(%.1fs) %s", dur.Seconds(), timeStr)
+		case dur < 1*time.Minute:
+			timeStr = fmt.Sprintf("(%.0fs) %s", dur.Seconds(), timeStr)
+		case dur < 2*time.Minute:
+			timeStr = fmt.Sprintf("(%.1fm) %s", dur.Minutes(), timeStr)
+		default:
+			timeStr = fmt.Sprintf("(%.0fm) %s", dur.Minutes(), timeStr)
+		}
 	}
 
 	// Render the input line

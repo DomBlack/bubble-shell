@@ -2,6 +2,7 @@ package history
 
 import (
 	"strings"
+	"time"
 
 	"github.com/DomBlack/bubble-shell/internal/config"
 	. "github.com/DomBlack/bubble-shell/pkg/modelid"
@@ -71,6 +72,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, tea.Batch(
 				msg.Item.Init(),
 				m.SaveHistory(m.Items),
+				func() tea.Msg {
+					// start tick messages for the new item, so that we get refreshed
+					// while the item is running
+					return tickMsg{
+						ID:     m.id,
+						ItemID: msg.Item.ID,
+					}
+				},
 			)
 		}
 
@@ -125,6 +134,28 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 						break
 					}
 				}
+			}
+		}
+
+	case tickMsg:
+		if m.id.Matches(msg) && len(m.Items) > 0 {
+			// Tick messages are so we can update the timer when the item is running
+			lastItem := m.Items[len(m.Items)-1]
+			if lastItem.ID == msg.ItemID && lastItem.Status == RunningStatus {
+				dur := 10 * time.Millisecond
+				if time.Since(lastItem.Started).Seconds() > 1 {
+					dur = 100 * time.Millisecond
+				} else if time.Since(lastItem.Started).Seconds() > 10 {
+					// under 10 seconds
+					dur = time.Second
+				}
+
+				return m, tea.Tick(dur, func(t time.Time) tea.Msg {
+					return tickMsg{
+						ID:     m.id,
+						ItemID: msg.ItemID,
+					}
+				})
 			}
 		}
 	}
@@ -294,5 +325,14 @@ type streamOutput struct {
 }
 
 func (msg streamOutput) ForModelID() ID {
+	return msg.ID
+}
+
+type tickMsg struct {
+	ID     ID
+	ItemID xid.ID
+}
+
+func (msg tickMsg) ForModelID() ID {
 	return msg.ID
 }
